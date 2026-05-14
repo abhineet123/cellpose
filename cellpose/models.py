@@ -463,6 +463,7 @@ class CellposeModel:
                 batch_size=batch_size,
                 tile_overlap=tile_overlap,
                 rsz=rescale if rescale != 1.0 else None,
+                verbose=self.verbose,
             )
             if resample:
                 if rescale != 1.0:
