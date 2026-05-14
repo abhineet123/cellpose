@@ -100,6 +100,7 @@ class CellposeModel:
         nchan=None,
         use_bfloat16=True,
         device2=None,
+        verbose=False,
     ):
         """
         Initialize the CellposeModel.
@@ -129,6 +130,7 @@ class CellposeModel:
         ### assign model device
         self.device = assign_device(gpu=gpu)[0] if device is None else device
         self.device2 = self.device if device2 is None else device2
+        self.verbose = verbose
 
         if torch.cuda.is_available():
             device_gpu = self.device.type == "cuda"
@@ -376,7 +378,8 @@ class CellposeModel:
             gc.collect()
 
         if compute_masks:
-            print(f"computing masks on {self.device2}...")
+            if self.verbose:
+                print(f"computing masks on {self.device2}...")
             # use user niter if specified, otherwise scale niter (200) with diameter
             niter_scale = 1 if image_scaling is None else image_scaling
             niter = int(200 / niter_scale) if niter is None or niter == 0 else niter
