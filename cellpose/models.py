@@ -146,6 +146,7 @@ class CellposeModel:
         ### assign model device
         self.device = assign_device(gpu=gpu)[0] if device is None else device
         self.device2 = self.device if device2 is None else device2
+        self.verbose = verbose
 
         if torch.cuda.is_available():
             device_gpu = self.device.type == "cuda"

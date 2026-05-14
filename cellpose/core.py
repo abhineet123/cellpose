@@ -164,7 +164,14 @@ def _forward(net, x):
 
 
 def run_net(
-    net, imgi, batch_size=8, augment=False, tile_overlap=0.1, bsize=224, rsz=None
+    net,
+    imgi,
+    batch_size=8,
+    augment=False,
+    tile_overlap=0.1,
+    bsize=224,
+    rsz=None,
+    verbose=False,
 ):
     """
     Run network on stack of images.
@@ -237,7 +244,10 @@ def run_net(
 
         # run network
         batch_ids = list(range(0, IMGa.shape[0], batch_size))
-        for j in tqdm(batch_ids, desc="tile inference"):
+        tile_pbar = batch_ids
+        if verbose:
+            tile_pbar = tqdm(tile_pbar, desc="tile inference")
+        for j in tile_pbar:
             bslc = slice(j, min(j + batch_size, IMGa.shape[0]))
             ya0, stylea0 = _forward(net, IMGa[bslc])
             if j == 0:
@@ -248,7 +258,10 @@ def run_net(
             stylea[bslc] = stylea0
 
         # average tiles
-        for i, b in enumerate(tqdm(inds, desc="tile averaging")):
+        tile_pbar = inds
+        if verbose:
+            tile_pbar = tqdm(tile_pbar, desc="tile averaging")
+        for i, b in enumerate(tile_pbar):
             if i == 0 and k == 0:
                 yf = np.zeros((Lz, nout, Ly, Lx), "float32")
                 styles = np.zeros((Lz, 256), "float32")
