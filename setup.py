@@ -14,7 +14,8 @@ install_deps = [
     'imagecodecs',
     'roifile',
     'fill-voids',
-    'segment_anything'
+    'segment_anything',
+    'dinov3 @ git+https://github.com/facebookresearch/dinov3.git'
 ]
 
 image_deps = ['nd2', 'pynrrd']
