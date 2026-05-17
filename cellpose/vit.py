@@ -3,11 +3,15 @@ Copyright © 2025 Howard Hughes Medical Institute, Authored by Carsen Stringer a
 """
 import torch
 from segment_anything import sam_model_registry
-from dinov3.hub.backbones import dinov3_vitl16, dinov3_vitb16
 from torch import nn 
 import torch.nn.functional as F
 from pathlib import Path
 torch.backends.cuda.matmul.allow_tf32 = True
+
+try:
+    from dinov3.hub.backbones import dinov3_vitl16, dinov3_vitb16
+except ImportError:
+    raise ImportError("dinov3 is required for CPDINO. Install with 'pip install cellpose[dino]'.")
 
 
 class BaseModel(nn.Module):
