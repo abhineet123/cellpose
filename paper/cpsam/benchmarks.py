@@ -138,7 +138,7 @@ def run_cellpose4(dsets=None, mtype="cpsam"):
     elif mtype=='cpsam_linear':
         pretrained_model = root / "../models/cpsam8_1000_611548662_linearprobe"
     elif mtype=='cpdino-vitb_linear':
-        pretrained_model = root / "../models/cp1000_0.0002_0.4_0.1_718014955_linearprobe"
+        pretrained_model = root / "../models/cp1000_0.0002_0.4_0.1_718014955_linearprobe"        
     elif mtype=='cpdino_linear':
         pretrained_model = root / "../models/cp1000_0.0002_0.4_0.1_202203273_linearprobe"
     

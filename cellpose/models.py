@@ -145,7 +145,7 @@ class CellposeModel():
                 models_logger.warning(
                     f"pretrained model {pretrained_model} not found, using default model"
                 )
-                pretrained_model = cache_model_path("cpdino_vitl")
+                pretrained_model = cache_model_path("cpdino")
 
         self.pretrained_model = pretrained_model
         dtype = torch.bfloat16 if use_bfloat16 else torch.float32 
