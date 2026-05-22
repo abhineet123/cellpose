@@ -426,102 +426,104 @@ class MainW_3d(MainW):
         self.hLineOrtho[0].setPos(self.yortho)
 
     def update_ortho(self):
-        if self.NZ > 1 and self.orthobtn.isChecked():
-            dzcurrent = self.dz
-            self.dz = min(100, max(3, int(self.dzedit.text())))
-            self.zaspect = max(0.01, min(100., float(self.zaspectedit.text())))
-            self.dzedit.setText(str(self.dz))
-            self.zaspectedit.setText(str(self.zaspect))
-            if self.dz != dzcurrent:
-                self.pOrtho[0].setXRange(-self.dz / 3, self.dz * 2 + self.dz / 3)
-                self.pOrtho[1].setYRange(-self.dz / 3, self.dz * 2 + self.dz / 3)
-            dztot = min(self.NZ, self.dz * 2)
-            y = self.yortho
-            x = self.xortho
-            z = self.currentZ
-            if dztot == self.NZ:
-                zmin, zmax = 0, self.NZ
+        if not (self.NZ > 1 and self.orthobtn.isChecked()):
+            return
+
+        dzcurrent = self.dz
+        self.dz = min(100, max(3, int(self.dzedit.text())))
+        self.zaspect = max(0.01, min(100., float(self.zaspectedit.text())))
+        self.dzedit.setText(str(self.dz))
+        self.zaspectedit.setText(str(self.zaspect))
+        if self.dz != dzcurrent:
+            self.pOrtho[0].setXRange(-self.dz / 3, self.dz * 2 + self.dz / 3)
+            self.pOrtho[1].setYRange(-self.dz / 3, self.dz * 2 + self.dz / 3)
+        dztot = min(self.NZ, self.dz * 2)
+        y = self.yortho
+        x = self.xortho
+        z = self.currentZ
+        if dztot == self.NZ:
+            zmin, zmax = 0, self.NZ
+        else:
+            if z - self.dz < 0:
+                zmin = 0
+                zmax = zmin + self.dz * 2
+            elif z + self.dz >= self.NZ:
+                zmax = self.NZ
+                zmin = zmax - self.dz * 2
             else:
-                if z - self.dz < 0:
-                    zmin = 0
-                    zmax = zmin + self.dz * 2
-                elif z + self.dz >= self.NZ:
-                    zmax = self.NZ
-                    zmin = zmax - self.dz * 2
-                else:
-                    zmin, zmax = z - self.dz, z + self.dz
-            self.zc = z - zmin
-            self.update_crosshairs()
+                zmin, zmax = z - self.dz, z + self.dz
+        self.zc = z - zmin
+        self.update_crosshairs()
 
-            is_image_view = self.view == 'image'
-            is_restored_view = self.view == 'restored'
+        is_image_view = self.view == 'image'
+        is_restored_view = self.view == 'restored'
 
-            rgb_list = ['red', 'green', 'blue']
+        rgb_list = ['red', 'green', 'blue']
 
-            if is_image_view or is_restored_view:
-                for j in range(2):
-                    if j == 0:
-                        if is_image_view:
-                            image = self.stack[zmin:zmax, :, x].transpose(1, 0, 2).copy()
-                        else:
-                            image = self.stack_filtered[zmin:zmax, :,
-                                                        x].transpose(1, 0, 2).copy()
+        if is_image_view or is_restored_view:
+            for j in range(2):
+                if j == 0:
+                    if is_image_view:
+                        image = self.stack[zmin:zmax, :, x].transpose(1, 0, 2).copy()
                     else:
-                        image = self.stack[
-                            zmin:zmax,
-                            y, :].copy() if is_image_view else self.stack_filtered[zmin:zmax,
-                                                                             y, :].copy()
-                    if self.nchan == 1:
-                        # show single channel
-                        image = image[..., 0]
-                    if self.color == 'rgb':
-                        self.imgOrtho[j].setImage(image, autoLevels=False, lut=None)
-                        if self.nchan > 1:
-                            levels = np.array([
-                                self.saturation[0][self.currentZ],
-                                self.saturation[1][self.currentZ],
-                                self.saturation[2][self.currentZ]
-                            ])
-                            self.imgOrtho[j].setLevels(levels)
-                        else:
-                            self.imgOrtho[j].setLevels(
-                                self.saturation[0][self.currentZ])
-                    elif self.color in rgb_list:
-                        color_index = rgb_list.index(self.color)
-                        if self.nchan > 1:
-                            image = image[..., color_index]
-                        self.imgOrtho[j].setImage(image, autoLevels=False,
-                                                  lut=self.cmap[color_index + 1])
-                        if self.nchan > 1:
-                            self.imgOrtho[j].setLevels(
-                                self.saturation[color_index][self.currentZ])
-                        else:
-                            self.imgOrtho[j].setLevels(
-                                self.saturation[0][self.currentZ])
-                    elif self.color == 'gray':
-                        if image.ndim > 2:
-                            # exclude blank channels: 
-                            ranges = np.ptp(image, tuple(range(image.ndim-1)))
-                            range_mask = ranges > 1e-5
-                            image = image[..., range_mask]
-                            image = image.astype("float32").mean(axis=2).astype("uint8")
-                        self.imgOrtho[j].setImage(image, autoLevels=False, lut=None)
-                        self.imgOrtho[j].setLevels(self.saturation[0][self.currentZ])
-                    elif self.color == 'spectral':
-                        if image.ndim > 2:
-                            image = image.astype("float32").mean(axis=2).astype("uint8")
-                        self.imgOrtho[j].setImage(image, autoLevels=False,
-                                                  lut=self.cmap[0])
-                        self.imgOrtho[j].setLevels(self.saturation[0][self.currentZ])
-                self.pOrtho[0].setAspectLocked(lock=True, ratio=self.zaspect)
-                self.pOrtho[1].setAspectLocked(lock=True, ratio=1. / self.zaspect)
+                        image = self.stack_filtered[zmin:zmax, :,
+                                                    x].transpose(1, 0, 2).copy()
+                else:
+                    image = self.stack[
+                        zmin:zmax,
+                        y, :].copy() if is_image_view else self.stack_filtered[zmin:zmax,
+                                                                         y, :].copy()
+                if self.nchan == 1:
+                    # show single channel
+                    image = image[..., 0]
+                if self.color == 'rgb':
+                    self.imgOrtho[j].setImage(image, autoLevels=False, lut=None)
+                    if self.nchan > 1:
+                        levels = np.array([
+                            self.saturation[0][self.currentZ],
+                            self.saturation[1][self.currentZ],
+                            self.saturation[2][self.currentZ]
+                        ])
+                        self.imgOrtho[j].setLevels(levels)
+                    else:
+                        self.imgOrtho[j].setLevels(
+                            self.saturation[0][self.currentZ])
+                elif self.color in rgb_list:
+                    color_index = rgb_list.index(self.color)
+                    if self.nchan > 1:
+                        image = image[..., color_index]
+                    self.imgOrtho[j].setImage(image, autoLevels=False,
+                                              lut=self.cmap[color_index + 1])
+                    if self.nchan > 1:
+                        self.imgOrtho[j].setLevels(
+                            self.saturation[color_index][self.currentZ])
+                    else:
+                        self.imgOrtho[j].setLevels(
+                            self.saturation[0][self.currentZ])
+                elif self.color == 'gray':
+                    if image.ndim > 2:
+                        # exclude blank channels: 
+                        ranges = np.ptp(image, tuple(range(image.ndim-1)))
+                        range_mask = ranges > 1e-5
+                        image = image[..., range_mask]
+                        image = image.astype("float32").mean(axis=2).astype("uint8")
+                    self.imgOrtho[j].setImage(image, autoLevels=False, lut=None)
+                    self.imgOrtho[j].setLevels(self.saturation[0][self.currentZ])
+                elif self.color == 'spectral':
+                    if image.ndim > 2:
+                        image = image.astype("float32").mean(axis=2).astype("uint8")
+                    self.imgOrtho[j].setImage(image, autoLevels=False,
+                                              lut=self.cmap[0])
+                    self.imgOrtho[j].setLevels(self.saturation[0][self.currentZ])
+            self.pOrtho[0].setAspectLocked(lock=True, ratio=self.zaspect)
+            self.pOrtho[1].setAspectLocked(lock=True, ratio=1. / self.zaspect)
 
-            else:
-                image = np.zeros((10, 10), "uint8")
-                self.imgOrtho[0].setImage(image, autoLevels=False, lut=None)
-                self.imgOrtho[0].setLevels([0.0, 255.0])
-                self.imgOrtho[1].setImage(image, autoLevels=False, lut=None)
-                self.imgOrtho[1].setLevels([0.0, 255.0])
+        else:
+            image = np.zeros((10, 10), "uint8")
+            self.imgOrtho[0].setImage(image, autoLevels=False, lut=None)
+            self.imgOrtho[0].setLevels([0.0, 255.0])
+            self.imgOrtho[1].setImage(image, autoLevels=False, lut=None)
+            self.imgOrtho[1].setLevels([0.0, 255.0])
 
         zrange = zmax - zmin
         self.layer_ortho = [
