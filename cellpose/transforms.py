@@ -873,12 +873,13 @@ def random_rotate_and_resize(imgs, lbls=None, scale_range=1., bsize=256, rescale
         if rescale is not None:
             scale *= 1. / rescale[n]
         scale_per_image[n] = scale
-        angle = 360 * np.random.rand() - 180
+        angle = np.float32(360 * np.random.rand() - 180)
         Ly, Lx = imgs[n].shape[-2:]
-        dyx = np.maximum(0, np.array([Ly * scale - yx[0], Lx * scale - yx[1]]))
+        dyx = np.maximum(0, np.array([Ly * scale - yx[0], Lx * scale - yx[1]])).astype("float32")
         flip = np.random.rand() > 0.5
-        translations = list(dyx * np.random.rand(2) * 1 - dyx * 0.5)
-        matrix = F._get_inverse_affine_matrix([0., 0.], angle, translations, scale, [0., 0.])
+        translations = list(dyx * np.random.rand(2).astype("float32") * 1 - dyx * 0.5)
+        matrix = F._get_inverse_affine_matrix(np.zeros(2, "float32"), angle, translations, 
+                                              scale, np.zeros(2, "float32"))
         theta = torch.tensor(matrix, device=device).reshape(1, 2, 3)
         grid = F_t._gen_affine_grid(theta, w=Lx, h=Ly, ow=yx[1], oh=yx[0])
 

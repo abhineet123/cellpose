@@ -10,6 +10,7 @@ import pyqtgraph as pg
 import numpy as np
 import pathlib, os
 
+from cellpose import models
 from cellpose.gui.io import _save_sets
 
 
@@ -111,32 +112,6 @@ class DarkPalette(QtGui.QPalette):
         )
 
 
-# def create_channel_choose():
-#     # choose channel
-#     ChannelChoose = [QComboBox(), QComboBox()]
-#     ChannelLabels = []
-#     ChannelChoose[0].addItems(["gray", "red", "green", "blue"])
-#     ChannelChoose[1].addItems(["none", "red", "green", "blue"])
-#     cstr = ["chan to segment:", "chan2 (optional): "]
-#     for i in range(2):
-#         ChannelLabels.append(QLabel(cstr[i]))
-#         if i == 0:
-#             ChannelLabels[i].setToolTip(
-#                 "this is the channel in which the cytoplasm or nuclei exist \
-#             that you want to segment")
-#             ChannelChoose[i].setToolTip(
-#                 "this is the channel in which the cytoplasm or nuclei exist \
-#             that you want to segment")
-#         else:
-#             ChannelLabels[i].setToolTip(
-#                 "if <em>cytoplasm</em> model is chosen, and you also have a \
-#             nuclear channel, then choose the nuclear channel for this option")
-#             ChannelChoose[i].setToolTip(
-#                 "if <em>cytoplasm</em> model is chosen, and you also have a \
-#             nuclear channel, then choose the nuclear channel for this option")
-
-#     return ChannelChoose, ChannelLabels
-
 def unsilence_exceptions(func):
     """ Wrapper to unsilence Qt exceptions and re-raise them """
     def wrapper(*args, **kwargs):
@@ -147,19 +122,6 @@ def unsilence_exceptions(func):
             logger.critical(f"Uncaught exception in {func.__name__}")
             logger.debug(''.join(traceback.format_exception(type(e), e, e.__traceback__)))
     return wrapper
-
-class ModelButton(QPushButton):
-
-    def __init__(self, parent, model_name, text):
-        super().__init__()
-        self.setEnabled(False)
-        self.setText(text)
-        self.setFont(parent.boldfont)
-        self.clicked.connect(lambda: self.press(parent))
-        self.model_name = "cpsam"
-
-    def press(self, parent):
-        parent.compute_segmentation(model_name="cpsam")
 
 
 class FilterButton(QPushButton):
@@ -428,7 +390,7 @@ class SegmentationSettings(QWidget):
 
 class TrainWindow(QDialog):
 
-    def __init__(self, parent, model_strings):
+    def __init__(self, parent):
         super().__init__(parent)
         self.setGeometry(100, 100, 900, 550)
         self.setWindowTitle("train settings")
@@ -446,7 +408,7 @@ class TrainWindow(QDialog):
         # choose initial model
         yoff += 1
         self.ModelChoose = QComboBox()
-        self.ModelChoose.addItems(model_strings)
+        self.ModelChoose.addItems(models.MODEL_NAMES)
         self.ModelChoose.setFixedWidth(150)
         self.ModelChoose.setCurrentIndex(parent.training_params["model_index"])
         self.l0.addWidget(self.ModelChoose, yoff, 1, 1, 1)
@@ -667,6 +629,7 @@ class ImageDraw(pg.ImageItem):
             if y >= 0 and y < self.parent.Ly and x >= 0 and x < self.parent.Lx:
                 if ev.button() == QtCore.Qt.LeftButton and not ev.double():
                     idx = self.parent.cellpix[self.parent.currentZ][y, x]
+                    self.parent.logger.debug(f'clicked on idx: {idx}')
                     if idx > 0:
                         if ev.modifiers() & QtCore.Qt.ControlModifier:
                             # delete mask selected
@@ -687,8 +650,16 @@ class ImageDraw(pg.ImageItem):
                         self.parent.unselect_cell()
 
     @unsilence_exceptions
+    def mouseDoubleClickEvent(self, ev) -> None:
+        ev.accept()
+        return
+
+    @unsilence_exceptions
     def mouseDragEvent(self, ev):
-        ev.ignore()
+        if ev.button() == QtCore.Qt.RightButton:
+            ev.accept()
+        else:
+            ev.ignore()
         return
 
     @unsilence_exceptions
@@ -717,6 +688,9 @@ class ImageDraw(pg.ImageItem):
         # first check if you ever left the start
         if len(self.parent.current_stroke) > 3:
             stroke = np.array(self.parent.current_stroke)
+            stroke = stroke[stroke[:, 0] == self.parent.currentZ]
+            if len(stroke) <= 3:
+                return False
             dist = (((stroke[1:, 1:] -
                       stroke[:1, 1:][np.newaxis, :, :])**2).sum(axis=-1))**0.5
             dist = dist.flatten()
@@ -731,10 +705,19 @@ class ImageDraw(pg.ImageItem):
             else:
                 return False
 
-    def end_stroke(self):
+    def end_stroke(self, keep_stroke=True):
         if hasattr(self, 'scatter') and self.scatter is not None:
             if self.scatter.scene() == self.parent.layer.scene():
                 self.parent.p0.removeItem(self.scatter)
+        if not keep_stroke:
+            if not self.parent.stroke_appended:
+                self.parent.strokes.append(self.parent.current_stroke)
+                self.parent.stroke_appended = True
+            self.parent.remove_stroke(delete_points=False)
+            self.parent.current_stroke = [s for s in self.parent.current_stroke
+                                          if s[0] != self.parent.currentZ]
+            self.parent.in_stroke = False
+            return
         if not self.parent.stroke_appended:
             self.parent.strokes.append(self.parent.current_stroke)
             self.parent.stroke_appended = True
