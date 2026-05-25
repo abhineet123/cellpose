@@ -18,11 +18,11 @@ from semantic import cl_colors, cl_names
 
 colors_tab = plt.get_cmap("tab10").colors
 colors = ["g",  np.maximum(0, np.array(colors_tab[1])-0.1), #[0,1,0],
-                [0.5, 0.3, 0], "tab:blue", [0.7,0.4,1], [1, 0.7, 1], [0.9,0.4,1], 
-                "y", [0, 1, 1]]
+                [0.5, 0.3, 0], "c", [0.7,0.4,1], [1, 0.7, 1], [0.9,0.4,1], 
+                "y", "tab:blue"]
 algs = ["cyto3", "cellsam", "samcell", "microsam", "cpsam", "cpdino-vitb", "cpdino", "omnipose", "pathosam"]
 alg_names = np.array(["Cellpose cyto3", "CellSAM", "SAMCell", "MicroSAM", "CellposeSAM",
-                       "CellposeDino-ViTB", "CellposeDino", "Omnipose", "PathoSAM"])
+                       "CellposeDINO-ViTB", "CellposeDINO", "Omnipose", "PathoSAM"])
 
 outcols = [[0.8, 0.8,0.3], [0.7,0.4,1]]
 
@@ -398,6 +398,189 @@ def fig2(root, save_fig=False):
 
     return errors
 
+
+def supp_models(root, save_fig=False):
+    algs = ["cpsam", "cpdino", "cpdino-vitb", "cpdino_ps16", "cpsam_linear", 
+        "cpdino_linear", "cpdino-vitb_linear"]
+
+    dataset = "cyto2"
+
+    files, imgs, masks_H1 = load_dataset("cyto2", root=root / "../")
+
+    aps, tps, fps, fns = [], [], [], []
+    errors = []
+    masks_preds = []
+    runtimes = []
+    for alg in algs:
+        dat = np.load(root / f"results/{alg}_{dataset}.npy", allow_pickle=True).item()
+        errors.append((dat["fp"] + dat["fn"]) / (dat["tp"] + dat["fn"]))
+        aps.append(dat["ap"])
+        tps.append(dat["tp"])
+        fps.append(dat["fp"])
+        fns.append(dat["fn"])
+        masks_preds.append(dat["masks_pred"])
+        if "runtime" in dat:
+            runtimes.append(dat["runtime"])
+        if alg == "cpsam_linear": 
+            flows = dat["flows"]
+        
+    aps = np.array(aps)
+    errors = np.array(errors)
+    tps = np.array(tps)
+    fps = np.array(fps)
+    fns = np.array(fns)
+    runtimes = np.array(runtimes)
+
+    fig = plt.figure(figsize=(14,6), dpi=150)
+    grid = plt.GridSpec(2, 8, hspace=0.2, wspace=0.35, top=0.95, bottom=0.11, left=0.05, right=0.98)
+    il = 0
+
+    print(aps[:,:,0].mean(axis=1))
+    print(errors[:,:,0].mean(axis=1))
+
+    colors = [alg_dict[alg.split("_")[0]]["color"] for alg in algs]
+    colors[3] = [1, 0, 0.2]
+    names = [alg_dict[alg.split("_")[0]]["name"] for alg in algs]
+    names[3] += " patch-size=16"
+    names = [name + (" linear-probe" if "linear" in alg else "") for name, alg in zip(names, algs)]
+
+    ax = plt.subplot(grid[0, 0])
+    pos = ax.get_position().bounds 
+    ax.set_position([pos[0], pos[1]+0.*pos[3], pos[2], pos[3]*0.75])
+    axin = ax.inset_axes([0, 1.02, 1, 0.25])
+    for i, alg in enumerate(algs):
+        vp = ax.violinplot(aps[i, :, 0], positions=[i], widths=0.6, showmeans=True, 
+                    showextrema=False)
+        vp["bodies"][0].set_facecolor(colors[i])
+        vp["bodies"][0].set_alpha(0.35)
+        ax.plot(i + 0.3*np.array([-1,1]), aps[i, :, 0].mean()*np.ones(2), color=colors[i], lw=3)
+        if i > 0:
+            p = wilcoxon(aps[0, :, 0], aps[i, :, 0]).pvalue 
+            print(p)
+            axin.plot([0, i], np.ones(2)*(0.95 + (len(aps)-1-i)*0.02), lw=1, color="k")
+            pstr = "***" if p < 0.001 else "**" if p < 0.01 else "*" if p < 0.05 else "n.s."
+            axin.text((i)/2, 0.95 + (len(aps)-1-i)*0.02 - 0.015 + 0.01*(pstr=="n.s."), 
+                      pstr, ha="center", va="bottom")
+    ax.set_ylabel("average precision (AP) @ 0.5 IoU")
+    ax.set_ylim([0., 1.0])
+    ax.set_xlim([-.5, len(aps)-1 + .5])
+    axin.set_xlim([-.5, len(aps)-1 + .5])
+    axin.axis("off")
+    ax.set_xticks(np.arange(len(aps)))
+    ax.set_xticklabels(names, rotation=90, ha="center", fontsize="small")
+    transl = mtransforms.ScaledTranslation(-40 / 72, 40 / 72, fig.dpi_scale_trans)
+    il = plot_label(ltr, il, ax, transl, fs_title)
+    for i, xtick in enumerate(ax.xaxis.get_ticklabels()):
+        xtick.set_color(colors[i])        
+
+    grid1 = matplotlib.gridspec.GridSpecFromSubplotSpec(3, 2, subplot_spec=grid[:, 1:3], 
+                                                        wspace=0.1, hspace=0.2)
+    
+    iex = 15
+    ylim = [50, 180]
+    xlim = [50, 200]
+    ax = plt.subplot(grid1[0, 0])
+    ax.imshow(imgs[iex][0], cmap="gray", vmin=0, vmax=1)
+    ax.axis("off")
+    ax.set_ylim(ylim)
+    ax.set_xlim(xlim)
+    ax.set_title("image", fontsize="medium", loc="center")
+    transl = mtransforms.ScaledTranslation(-20 / 72, 10 / 72, fig.dpi_scale_trans)
+    il = plot_label(ltr, il, ax, transl, fs_title)
+    
+    ax = plt.subplot(grid1[1, 0])
+    ax.imshow(flows[iex][0])
+    ax.axis("off")
+    ax.set_ylim(ylim)
+    ax.set_xlim(xlim)
+    ax.set_title("flows from\nlinear probe", fontsize="medium", loc="center")
+    
+    ax = plt.subplot(grid1[2, 0])
+    ax.imshow(flows[iex][2])
+    ax.axis("off")
+    ax.set_ylim(ylim)
+    ax.set_xlim(xlim)
+    ax.set_title("cell-prob. from\nlinear probe", fontsize="medium", loc="center")
+
+    grid1 = matplotlib.gridspec.GridSpecFromSubplotSpec(2, 4, subplot_spec=grid[:, 2:], 
+                                                        wspace=0.4, hspace=0.5)
+    for nd in range(2, 4):
+        if nd==2:
+            ntiles_all = 2 ** np.arange(0, 8)# np.array([1, 16, 32, 64, 128])
+            print(ntiles_all)
+        else:
+            ntiles_all = np.array([1, 2, 4, 6, 8])
+            print(ntiles_all)
+
+        algs = ["cpsam", "cpdino", "cpdino-vitb", "cyto3"]
+        gpus = ["r4070s", "p6000", "a100", "h100"]
+        gpu_names = ["RTX 4070S", "RTX PRO 6000", "A100", "H100"]
+        mem_max = np.nan * np.zeros((len(algs), len(gpus), len(ntiles_all)))
+        mem_gpu_max = np.nan * np.zeros((len(algs), len(gpus), len(ntiles_all)))
+        runtime = np.nan * np.zeros((len(algs), len(gpus), len(ntiles_all)))
+        for i, ntiles in enumerate(ntiles_all):
+            for j, alg in enumerate(algs):
+                for k, gpu in enumerate(gpus):
+                    if Path(f"ramlogs/mem_{nd}d_{ntiles}_{alg}_{gpu}.out").exists():
+                        with open(f"ramlogs/mem_{nd}d_{ntiles}_{alg}_{gpu}.out", "r") as f:
+                            out = f.read()
+                            out = out.split("\n")[1:-1]
+                            mem = np.array([float(x.split(" ")[1]) for x in out if x[:3]=="MEM"])
+                        mem_max[j, k, i] = mem.max()/1e3
+
+                        with open(f"ramlogs/log_{nd}d_{ntiles}_{alg}_{gpu}.out", "r") as f:
+                            out = f.read()
+                            out = out.split("\n")[-6:-4]
+                            try:
+                                mr = np.array([float(x) for x in out])
+                            except:
+                                mr = np.array([np.nan, np.nan])
+                        mem_gpu_max[j, k, i] = mr[-1]
+                        runtime[j, k, i] = mr[0]
+
+        for k, gpu in enumerate(gpus):
+            ax = plt.subplot(grid1[nd-2, k])
+            pos = ax.get_position().bounds
+            ax.set_position([pos[0]+0.018*(3-k), *pos[1:]])
+            print(f"nd={nd}, gpu={gpu}")
+            print("RAM")
+            print(mem_max[:, k])
+            print("GPU RAM")
+            print(mem_gpu_max[:, k])
+            print("Runtime")
+            print(runtime[:, k])
+            for j in range(len(algs)):
+                ax.loglog((ntiles_all*150)**nd, runtime[j, k], label=algs[j], marker="o",
+                        color=alg_dict[algs[j]]["color"], markersize=3, lw=1)
+                if k==0 and nd==2:
+                    ax.text(0.35, 0.27-0.08*j, alg_dict[algs[j]]["name"], color=alg_dict[algs[j]]["color"], 
+                            transform=ax.transAxes)
+            ax.set_ylim([1.e-2, 3.55*60] if nd==2 else [60e-2, 46*60])
+            slc = slice(0, len(ntiles_all)) if k>0 else slice(0, len(ntiles_all)-1)
+            ax.set_xticks((ntiles_all[slc]*150)**nd)
+            ax.set_xticklabels([rf"{ntiles*150:,d}$^{{{nd}}}$" for ntiles in ntiles_all[slc]], 
+                               rotation=45, ha="right", va="top")
+            if k==0:
+                ax.set_ylabel("runtime (sec.)")
+                ax.set_xlabel("number of pixels", labelpad=0)
+                ax.text(-0.2, 1.02, f"{nd}D segmentation", fontsize="large", fontstyle="italic", 
+                        transform=ax.transAxes, va="bottom")
+                transl = mtransforms.ScaledTranslation(-45 / 72, 5 / 72, fig.dpi_scale_trans)
+                il = plot_label(ltr, il, ax, transl, fs_title)
+            # turn off minor ticks
+            ax.xaxis.set_minor_locator(plt.NullLocator())
+            #if nd==3:
+            ax.set_title(f"{gpu_names[k]}", fontsize="medium", loc="center", y=0.88)
+    
+    if save_fig:
+        fig.savefig("figures/supp_models.pdf", dpi=150)
+    
+def cp4_text(ax, x, y):
+    ax.text(x, y, "CellposeSAM" + 27*" ", color=alg_dict["cpsam"]["color"], transform=ax.transAxes, ha="right")
+    ax.text(x, y, "CellposeDINO" + 0*" ", color=alg_dict["cpdino"]["color"], transform=ax.transAxes, ha="right")
+    ax.text(x-0., y-0.13, "CellposeDINO-ViTB", color=alg_dict["cpdino-vitb"]["color"], transform=ax.transAxes, ha="right")
+
+
 def fig3(root, save_fig=False):
     files, imgs, masks_true = load_dataset("cyto2", root=root / "..")
     diam_true = [utils.diameters(m)[0] for m in masks_true]
@@ -408,19 +591,20 @@ def fig3(root, save_fig=False):
     il = 0
     transl = mtransforms.ScaledTranslation(-14 / 72, 6 / 72, fig.dpi_scale_trans)        
 
-    colors_tab = plt.get_cmap("tab10").colors
-    colors = np.array([[0,0.5,0.], [0,1,0], colors_tab[6], 
-            np.maximum(0, np.array(colors_tab[1])-0.1), [0.7,0.4,1]])
-
     xlabels = ['RGB', 'BRG', 'GBR', 'random']
     cperms = [[0,1,2], [1,2,0], [2,0,1], np.random.permutation(3)]
 
     aps, masks_preds = [], []
-    for xl in xlabels:
-        dat = np.load(root / f"results/cpsam_cyto2_{xl}.npy", allow_pickle=True).item()
-        aps.append(dat["ap"])
-        masks_preds.append(dat["masks_pred"])
+    algs = ["cpsam", "cpdino", "cpdino-vitb"]
+    for alg in algs:
+        aps.append([])
+        masks_preds.append([])
+        for xl in xlabels:
+            dat = np.load(root / f"results/{alg}_cyto2_{xl}.npy", allow_pickle=True).item()
+            aps[-1].append(dat["ap"])
+            masks_preds[-1].append(dat["masks_pred"])
     aps = np.array(aps)
+    print(aps.shape)
     
     grid1 = matplotlib.gridspec.GridSpecFromSubplotSpec(1, 4, subplot_spec=grid[0, :4],
                                                             wspace=0.1, hspace=0.2)
@@ -429,14 +613,14 @@ def fig3(root, save_fig=False):
         pos = ax.get_position().bounds
         ax.set_position([pos[0]-0.03*i, pos[1], pos[2], pos[3]])
         img_rsz = imgs[iex].transpose(1,2,0).transpose(1,0,2).copy()
-        img_rsz = np.concatenate((img_rsz[:,:,::-1], np.zeros_like(img_rsz[:,:,:1])), axis=-1)
+        img_rsz = np.concatenate((img_rsz, np.zeros_like(img_rsz[:,:,:1])), axis=-1)
         masks_true_rsz = masks_true[iex].copy()
         ax.imshow(np.clip(img_rsz[:,:,cperms[i]]*1.1, 0, 1), interpolation="nearest")  
         outlines = utils.outlines_list(masks_true_rsz, multiprocessing=False)
         for outline in outlines:
             ax.plot(outline[:, 1], outline[:, 0], color=outcols[0], lw=1)
 
-        outlines = utils.outlines_list(masks_preds[i][iex], multiprocessing=False)
+        outlines = utils.outlines_list(masks_preds[0][i][iex], multiprocessing=False)
         for outline in outlines:
             ax.plot(outline[:, 1], outline[:, 0], color=outcols[1], lw=1, linestyle="--")
         ycent, xcent = img_rsz.shape[0]//2, img_rsz.shape[1]//2 
@@ -454,22 +638,25 @@ def fig3(root, save_fig=False):
     ax = plt.subplot(grid1[0, 3])
     pos = ax.get_position().bounds
     ax.set_position([pos[0]-0.025, pos[1]+0.15*pos[3], pos[2], pos[3]*0.9])
-    for j in range(4):
-        vp = ax.violinplot(aps[j,:,0], positions=[j], widths=0.6, showmeans=True, showextrema=False)
-        vp["bodies"][0].set_facecolor(outcols[1])
-        vp["bodies"][0].set_alpha(0.5)
-        ax.plot(0.3*np.array([-1,1]) + j, aps[j,:,0].mean()*np.ones(2), 
-                color=outcols[1], lw=2)
-    ax.text(1, 0.35, "Cellpose-SAM", color=colors[4], transform=ax.transAxes, ha="right")
+    xp = 1.3
+    for j in range(len(algs)):
+        for i in range(len(xlabels)):
+            vp = ax.violinplot(aps[j,i,:,0], positions=[len(algs)*i*xp + j], widths=0.6, showmeans=True, showextrema=False)
+            vp["bodies"][0].set_facecolor(alg_dict[algs[j]]["color"])
+            vp["bodies"][0].set_alpha(0.5)
+            ax.plot(0.3*np.array([-1,1]) + len(algs)*i*xp + j, aps[j,i,:,0].mean()*np.ones(2), 
+                    color=alg_dict[algs[j]]["color"], lw=2)
+        ax.text(1, 0.35-j*0.13, alg_dict[algs[j]]["name"], color=alg_dict[algs[j]]["color"], 
+                transform=ax.transAxes, ha="right")
     ax.set_ylabel("AP @ 0.5 IoU")
-    ax.set_xticks([0, 1, 2, 3 ])
+    ax.set_xticks(np.arange(len(xlabels)*len(algs)*xp, step=len(algs)*xp) + 1)
     ax.set_xticklabels(xlabels, fontsize="small", rotation=30, ha="right")
     ax.set_ylim([0, 1])
     print(aps[:,:,0].mean(axis=-1))
 
     szs = [10, 15, 30, 60, 90]
     import cv2 
-    algs = ["cpsam", "cyto3"]
+    algs = ["cpsam", "cpdino", "cpdino-vitb", "microsam", "cellsam", "cyto3"]
     aps, masks_preds = [], []
     for alg in algs:
         aps.append([])
@@ -520,13 +707,15 @@ def fig3(root, save_fig=False):
     ax = plt.subplot(grid1[0, 3])
     pos = ax.get_position().bounds
     ax.set_position([pos[0]-0.025, pos[1]+0.15*pos[3], pos[2], pos[3]*0.9])
-    labels_all = [alg_dict[alg]["name"] for alg in algs]
+    cp4_text(ax, 1.1, 1.1)
     for j in range(len(algs)):
         ax.errorbar(np.arange(5), aps[j, :,:,0].mean(axis=-1).T, aps[j, :,:,0].std(axis=-1).T / (66**0.5),
-                    color=alg_dict[algs[j]]["color"])
-        ypos = 0.28- j*0.12 if j>0 else 0.95
-        xpos = 1 if j<2 else 0.7
-        ax.text(xpos, ypos, labels_all[j], color=alg_dict[algs[j]]["color"], transform=ax.transAxes, ha="right")
+                    color=alg_dict[algs[j]]["color"], lw=1)
+        if j>2:
+            xpos = 1.1
+            ypos = 0.35-(j-3)*0.1
+            ax.text(xpos, ypos, alg_dict[algs[j]]["name"], color=alg_dict[algs[j]]["color"], 
+                    transform=ax.transAxes, ha="right", va="top")
     ax.set_ylabel("AP @ 0.5 IoU")
     ax.set_xticks([0, 1, 2, 3 ,4])
     ax.set_ylim([0, 1])
@@ -535,7 +724,7 @@ def fig3(root, save_fig=False):
     ax.set_xlabel("cell diameter (pixels)")
     print(aps[:,:,:,0].mean(axis=-1))
 
-    algs = ["cpsam", "cyto3", "cyto3_restore"]
+    algs = ["cpsam", "cpdino", "cpdino-vitb", "microsam", "cellsam", "cyto3", "cyto3_restore"]
 
     nstr = ["Poisson noise", "blur", "pixel size", "anisotropic blur"]
     nstr = np.array(nstr)[[0, 2, 1, 3]]
@@ -616,27 +805,120 @@ def fig3(root, save_fig=False):
             
         ax = plt.subplot(grid1[0, 3])
         pos = ax.get_position().bounds
+        alg_names = [alg_dict[alg]["name"] if alg!="cyto3_restore" else f"-- cyto3+{rstr[ii]}" for alg in algs]
         ax.set_position([pos[0]-0.025, pos[1]+0.15*pos[3], pos[2], pos[3]*0.9])
+        if ii==0:
+            cp4_text(ax, 1.1, 1.05+0.1*(ii==3))
         for j in range(len(algs)):
             alg0 = algs[j] if algs[j]!="cyto3_restore" else "cyto3"
             ax.errorbar(np.arange(3), aps[j, :,:,0].mean(axis=-1).T, aps[j, :,:,0].std(axis=-1).T / (66**0.5),
                         color=alg_dict[alg0]["color"], 
                         ls="--" if algs[j]=="cyto3_restore" else "-")
-            xpos = 1.1 if j<2 else 0.05
-            ypos = 1.05-j*0.15+0.1*(ii==3) if j<2 else 0.3-(j-2)*0.15
-            ax.text(xpos, ypos, ["Cellpose-SAM", f"-- cyto3+{rstr[ii]}", "cyto3"][j], 
-                    color=alg_dict[alg0]["color"], transform=ax.transAxes, 
-                ha="left" if j>1 else "right", va="top")
+            if j == len(algs)-1 or (ii==0 and j>2):
+                xpos = 1.1 if j==len(algs)-1 else 0.02
+                ypos = 0.32-(j-3)*0.1 if j!=len(algs)-1 else 0.9+0.1*(ii==3)
+                ax.text(xpos, ypos, alg_names[j], 
+                        color=alg_dict[alg0]["color"], transform=ax.transAxes, 
+                    ha="left" if j!=len(algs)-1 else "right", va="top")
         ax.set_ylabel("AP @ 0.5 IoU")
         ax.set_xticks([0, 1, 2])
         ax.set_ylim([0, 1])
         ax.set_yticks([0, 0.5, 1.0])
         ax.set_xticklabels(["low", "medium", "high"])
         ax.set_xlabel(xstr[ii])
-        print(nstr[ii], aps[:,:,:,0].mean(axis=-1))
+        print(nstr[ii], aps[:,:,:,0].mean(axis=-1))        
 
     if save_fig:
         fig.savefig("figures/fig3.pdf", dpi=150)
+
+
+def supp_invariance(root, save_fig=False):
+    files, imgs, masks_true = load_dataset("cyto2", root=root / "..")
+    aps, masks_preds = [], []
+    algs = ["cpsam", "cpdino", "cpdino-vitb"]
+    xlabels = ['', 'BGR', 'ud', 'lr']
+    xnames = ['BGR (channel swap)', 'vertical flip', 'horizontal flip']
+    for alg in algs:
+        aps.append([])
+        masks_preds.append([])
+        for i, xl in enumerate(xlabels):
+            xl = f"_{xl}" if len(xl) > 0 else ""
+            dat = np.load(root / f"results/{alg}_cyto2{xl}.npy", allow_pickle=True).item()
+            #aps[-1].append(dat["ap"])
+            masks_preds[-1].append(dat["masks_pred"])
+            if i > 0:
+                ap, tp, fp, fn = metrics.average_precision(masks_preds[-1][0], masks_preds[-1][-1], np.arange(0.5, 1, 0.05))
+                aps[-1].append(ap)
+    aps = np.array(aps)
+    print(aps.shape)
+
+    fig = plt.figure(figsize=(14, 2.5))
+    grid = plt.GridSpec(1, 8, hspace=0.4, wspace=0.35, top=0.85, bottom=0.17, left=0.02, right=0.96)
+    il = 0
+    transl = mtransforms.ScaledTranslation(-14 / 72, 6 / 72, fig.dpi_scale_trans)        
+
+    iex = 19
+
+    outcols = ['r', 'b', [0, 0.7, 1]]
+    grid1 = matplotlib.gridspec.GridSpecFromSubplotSpec(1, 3, subplot_spec=grid[0, :5],
+                                                            wspace=0.1, hspace=0.2)
+    for i, xl in enumerate(xlabels[1:4]):
+        ax = plt.subplot(grid1[0, i])
+        pos = ax.get_position().bounds
+        ax.set_position([pos[0]-0.01*i, pos[1], pos[2], pos[3]])
+        img_rsz = imgs[iex].copy().transpose(1,2,0)
+        img_rsz = np.concatenate((img_rsz, np.zeros_like(img_rsz[:,:,:1])), axis=-1)
+        masks_true_rsz = masks_preds[0][0][iex].copy()
+        masks_pred = masks_preds[0][i+1][iex].copy()
+        if xl == "BGR":
+            img_rsz = img_rsz[:,:,[2,1,0]]
+        elif xl == "ud":
+            img_rsz = img_rsz[::-1]
+            masks_true_rsz = masks_true_rsz[::-1]
+            masks_pred = masks_pred[::-1]
+        elif xl == "lr":
+            img_rsz = img_rsz[:,::-1]
+            masks_true_rsz = masks_true_rsz[:,::-1]
+            masks_pred = masks_pred[:,::-1]
+        print(img_rsz.shape)
+        # if i>0:
+        #     img_rsz = img_rsz[:,:,:2].mean(axis=-1)
+        ax.imshow(np.clip(img_rsz*1.1, 0, 1), interpolation="nearest")  
+        outlines = utils.outlines_list(masks_true_rsz, multiprocessing=False)
+        for outline in outlines:
+            ax.plot(outline[:, 0], outline[:, 1], color='w', lw=1)
+
+        outlines = utils.outlines_list(masks_pred, multiprocessing=False)
+        for outline in outlines:
+            ax.plot(outline[:, 0], outline[:, 1], color=outcols[i], lw=2, linestyle=":")
+        ycent, xcent = img_rsz.shape[0]//2, img_rsz.shape[1]//2
+        ax.set_ylim([ycent-55, ycent+55])
+        ax.set_xlim([xcent-80, xcent+80])
+        ax.axis('off')
+        if i==0:
+            il = plot_label(ltr, il, ax, transl, fs_title)
+        ax.text(1, -0.01, f"AP@0.9={aps[0][i][iex,-2]:.2f}", transform=ax.transAxes, ha="right", va="top")
+        ax.set_title(xnames[i], loc="center", color=outcols[i])
+
+    transl = mtransforms.ScaledTranslation(-40 / 72, 6 / 72, fig.dpi_scale_trans)
+    for j in range(len(algs)):
+        ax = plt.subplot(grid[0, -(3-j)])
+        pos = ax.get_position().bounds
+        ax.set_position([pos[0], pos[1]+0.03, pos[2], pos[3]-0.03])
+        for i, xl in enumerate(xlabels[1:4]):
+            ax.plot(np.arange(0.5, 1, 0.05), aps[j][i].mean(axis=0), color=outcols[i], label=xl)
+        ax.set_ylim([0, 1])
+        ax.set_xlabel("IoU threshold")
+        ax.set_title(alg_dict[algs[j]]["name"], loc="center")
+        ax.set_xlim([0.5, 0.95])
+        ax.set_xticks(np.arange(0.5, 1, 0.1))
+        if j==0:
+            il = plot_label(ltr, il, ax, transl, fs_title)
+            ax.set_ylabel("average precision (AP)")
+
+    if save_fig:
+        fig.savefig("figures/supp_invariance.pdf", dpi=150)
+
 
 from tqdm import trange
 
@@ -724,16 +1006,12 @@ def fig4(root, save_fig=False):
     grid2 = [matplotlib.gridspec.GridSpecFromSubplotSpec(3, 1, subplot_spec=grid[:, 3:5], wspace=0.4, hspace=0.45),
             matplotlib.gridspec.GridSpecFromSubplotSpec(3, 1, subplot_spec=grid[:, -2:], wspace=0.4, hspace=0.45)]
     grid3 = matplotlib.gridspec.GridSpecFromSubplotSpec(3, 2, subplot_spec=grid[:, -5:-2], wspace=0.4, hspace=0.45)
+    algs = ["cyto3","cpsam", "cpdino", "cpdino-vitb"]
     for d, dset in enumerate(["blastospim", "root", "ovules"]):
         iex, ylim, xlim = iexs[d], ylims[d], xlims[d]
         dset_name = dset_names[d]
 
-        folder, aps, tps, fps, fns, masks_pred_all, ntrains, nrois = finetune_results(root, dset, load_3D=False)
-        # dat = np.load(f"results/aps_new_{dset}.npy", allow_pickle=True).item()
-        # aps = dat["aps"]
-        # #print(np.nanmean(aps[:,:,:,:,0], axis=(-1,-2)))
-        # masks_pred_all = dat["masks_pred_all"]
-        # nrois = dat["nrois"]
+        folder, aps, tps, fps, fns, masks_pred_all, ntrains, nrois = finetune_results(root, dset, load_3D=False, load_all=True)
         print(folder)
         test_files = (folder / "test").glob("*.tif")  
         test_files = natsorted([tf for tf in test_files if "_masks" not in str(tf)])
@@ -771,17 +1049,22 @@ def fig4(root, save_fig=False):
 
         for k in range(2):
             if k==1:
-                folder, aps, tps, fps, fns, masks_pred_all, _, _ = finetune_results(root, dset, load_3D=True)
+                folder, aps, tps, fps, fns, masks_pred_all, _, _ = finetune_results(root, dset, load_3D=True, load_all=True)
             ax = plt.subplot(grid2[k][d])
             pos = ax.get_position().bounds
             ax.set_position([pos[0]+0.2*pos[2]+0.14*pos[2]*(k==1), pos[1]-0.07*pos[3], pos[2]*0.7, pos[3]*1.1])
             accs = np.nanmean(aps[:,:,:,:,0], axis=-2)
             frac = 1 if d!=2 else 0.1
-            for j in range(2):
+            yy = [3, 0, 1, 2]
+            for j in range(len(algs)):
                 ax.errorbar(np.nanmean(nrois[:, 1:], axis=0) * frac, 
                             np.nanmean(accs[j,1:], axis=-1), np.nanstd(accs[j,1:], axis=-1) / (accs.shape[2]-1)**0.5,
-                            color=colors[j])
-                ax.errorbar(1, np.nanmean(accs[j,0]), marker="o", markersize=5, color=colors[j])
+                            color=alg_dict[algs[j]]["color"], lw=1)
+                ax.errorbar(1, np.nanmean(accs[j,0]), marker="o", markersize=5, 
+                            color=alg_dict[algs[j]]["color"])
+                if d==0:
+                    ax.text(1.05, 0.5-yy[j]*0.13, alg_dict[algs[j]]["name"], color=alg_dict[algs[j]]["color"], 
+                            transform=ax.transAxes, ha="right")
             ax.set_xscale("log")
             if d == 0:
                 ax.set_xlabel("# of training ROIs")
@@ -805,10 +1088,6 @@ def fig4(root, save_fig=False):
             ax.set_xlim([0.7, np.nanmax(nrois)*1.1*frac])
             if d==0:
                 ax.xaxis.set_minor_locator(plt.FixedLocator(np.hstack([np.arange(1, 10)*j for j in [1, 10, 100, 1000]])))
-                ax.text(1., 0.3, "CellposeSAM", transform=ax.transAxes, color=colors[1], 
-                        fontsize="large", ha="right")
-                ax.text(1., 0.15, "Cellpose cyto3", transform=ax.transAxes, color=colors[0], 
-                        fontsize="large", ha="right")
             else:
                 ax.xaxis.set_minor_locator(plt.FixedLocator(np.hstack([np.arange(1, 10)*j for j in [1, 10, 100, 1000, 10000]])))
             #plt.grid(color=0.9*np.ones(3))
@@ -836,70 +1115,6 @@ def fig4(root, save_fig=False):
 
     fig.savefig("figures/fig4.pdf", dpi=150)
 
-def supp_finetune(root, save_fig=False):
-    fig = plt.figure(figsize=(14, 3), dpi=150)
-    grid = plt.GridSpec(1, 6, hspace=0.4, wspace=0.5, top=0.93, bottom=0.07, left=0.02, right=0.98) 
-    transl = mtransforms.ScaledTranslation(-25 / 72, 18 / 72, fig.dpi_scale_trans)
-    il = 0
-    algs = ["cyto3", "cpsam", "cpdino", "cpdino-vitb"]
-    for d, dset in enumerate(["blastospim", "root", "ovules"]):
-        for k in range(2):
-            if k==0:
-                folder, aps, tps, fps, fns, masks_pred_all, _, nrois = finetune_results(root, dset, load_3D=False, load_all=True)
-            else:
-                folder, aps, tps, fps, fns, masks_pred_all, _, _ = finetune_results(root, dset, load_3D=True, load_all=True)
-            ax = plt.subplot(grid[0, 2*d+k])
-            pos = ax.get_position().bounds
-            ax.set_position([pos[0], pos[1], pos[2], pos[3]])
-            accs = np.nanmean(aps[:,:,:,:,0], axis=-2)
-            frac = 1 if d!=2 else 0.1
-            for j in range(len(algs)):
-                means = np.nanmean(accs[j,1:], axis=-1)
-                print(means if np.isnan(means).sum()>0 else np.nanmean(means))
-                ax.errorbar(np.nanmean(nrois[:, 1:], axis=0) * frac, 
-                            means, np.nanstd(accs[j,1:], axis=-1) / (accs.shape[2]-1)**0.5,
-                            color=alg_dict[algs[j]]["color"], alpha=0.8, zorder=-j + 10*(j==3))
-                ax.errorbar(1, np.nanmean(accs[j,0]), marker="o", markersize=5, 
-                            color=alg_dict[algs[j]]["color"], alpha=0.8, zorder=-j + 10*(j==3))
-            ax.set_xscale("log")
-            if k==0:
-                ax.text(0, 1.1, dset_names[d], transform=ax.transAxes, fontsize="large",
-                        fontstyle="italic")
-                il = plot_label(ltr, il, ax, transl, fs_title)
-                if d==0:
-                    ax.set_xlabel("# of training ROIs")
-                    ax.set_ylabel("AP @ 0.5 IoU")
-            ax.set_title(["2D", "3D"][k], loc="center", y=0.95)
-            ax.set_ylim([0, 1.0])#0.8 if d!=0 or k!=1 else 1.0])
-            dd = 2  # proportion of vertical to horizontal extent of the slanted line
-            kwargs = dict(marker=[(-1, -dd), (1, dd)], markersize=12,
-                        linestyle="none", color='k', mec='k', mew=1, clip_on=False)
-            ax.plot([1.8], [0], **kwargs)
-            ax.plot([2.3], [0], **kwargs)
-            xticks = 10**np.arange(0, 4 if d==1 else 5)
-            ax.set_xticks(xticks)
-            if d!=2:
-                ax.set_xticklabels([rf"10$^{t}$" if t!=0 else "0" for t in range(len(xticks))])    
-            else:
-                ax.set_xticklabels([rf"10$^{t+1}$" if t!=0 else "0" for t in range(len(xticks))])
-
-            for t in np.arange(1.95, 2.16, 0.05):
-                ax.plot([t], [0], marker=[(-1, -dd), (1, dd)], markersize=12, 
-                    color='w', mec='w', mew=1, clip_on=False, zorder=30)
-            ax.set_xlim([0.7, np.nanmax(nrois)*1.1*frac])
-            if d==0:
-                ax.xaxis.set_minor_locator(plt.FixedLocator(np.hstack([np.arange(1, 10)*j for j in [1, 10, 100, 1000]])))
-                if k==0:
-                    jj = [3, 0, 1, 2]
-                    for j in range(len(algs)):
-                        ax.text(1.25, 0.5-jj[j]*0.09, alg_dict[algs[j]]["name"], color=alg_dict[algs[j]]["color"], 
-                                transform=ax.transAxes, ha="right", fontsize="large", alpha=0.8)
-                    
-            else:
-                ax.xaxis.set_minor_locator(plt.FixedLocator(np.hstack([np.arange(1, 10)*j for j in [1, 10, 100, 1000, 10000]])))
-            #plt.grid(color=0.9*np.ones(3))
-    if save_fig:
-        fig.savefig("figures/supp_finetune.pdf", dpi=150)
 
 def fig5(root, save_fig=False): 
 
@@ -1176,7 +1391,7 @@ def supp_sim(root, save_fig=False):
     ax = plt.subplot(grid[1:5, -3:-1])
     il = plot_label(ltr, il, ax, mtransforms.ScaledTranslation(-20 / 72, 18 / 72, fig.dpi_scale_trans))
     pos = ax.get_position().bounds
-    ax.set_position([pos[0]-0.28*pos[2], pos[1], pos[2]*1.54, pos[3]])
+    ax.set_position([pos[0]-0.32*pos[2], pos[1], pos[2]*1.58, pos[3]])
     dataset = "cyto2"
     algs = ["cyto3", "cellsam", "samcell", "microsam", "cpdino-vitb", "cpdino", "cpsam"]
     alg_names = [alg_dict[alg]["name"].replace(" ", "\n").replace("-", "\n") for alg in algs]
@@ -1201,10 +1416,7 @@ def supp_sim(root, save_fig=False):
         err2 = (fp2 + fn2) / (fn2 + tp2)
         errors.append(np.stack((err[:,0], err2[:,0]), axis=-1))
     errors = np.array(errors)
-
-    colors_tab = plt.get_cmap("tab10").colors
-    colors = ["g",  np.maximum(0, np.array(colors_tab[1])-0.1), #[0,1,0],
-                    [0.5, 0.3, 0], [0.8,0.8,.3], [0.7,0.4,1], 'k', 'k']
+    print(errors.mean(axis=1))
 
     for i in range(len(algs)):
         for j in range(2):
@@ -1377,12 +1589,12 @@ def supp_bench(root, save_fig=False):
 def supp_noise(root, save_fig=False):
     files, imgs, masks_true = load_dataset("cyto2", root=root / "..")
     
-    fig = plt.figure(figsize=(14, 7*2./3), dpi=150)
-    grid = plt.GridSpec(2, 8, hspace=0.4, wspace=0.2, top=0.94, bottom=0.07, left=0.01, right=0.99)
+    fig = plt.figure(figsize=(14*0.6, 7*2./3), dpi=150)
+    grid = plt.GridSpec(2, 8, hspace=0.4, wspace=0.2, top=0.93, bottom=0.07, left=0.03, right=0.97)
     il = 0
     transl = mtransforms.ScaledTranslation(-14 / 72, 6 / 72, fig.dpi_scale_trans)        
 
-    algs = ["cpsam", "cpdino", "cpdino-vitb", "cellsam", "microsam"]
+    algs = ["cpsam"]#, "cpdino", "cpdino-vitb", "cellsam", "microsam"]
 
     iex = 2
     nstr = ["Poisson noise", "blur", "pixel size", "anisotropic blur"]
@@ -1403,7 +1615,7 @@ def supp_noise(root, save_fig=False):
                 
         aps = np.array(aps)
 
-        grid1 = matplotlib.gridspec.GridSpecFromSubplotSpec(1, 4, subplot_spec=grid[ii//2, (ii%2)*4:4+4*(ii%2)],
+        grid1 = matplotlib.gridspec.GridSpecFromSubplotSpec(1, 3, subplot_spec=grid[ii//2, (ii%2)*4:4+4*(ii%2)],
                                                             wspace=0.1, hspace=0.2)
 
         if noise_type=="poisson":
@@ -1419,7 +1631,7 @@ def supp_noise(root, save_fig=False):
             k = i
             ax = plt.subplot(grid1[0, i])
             pos = ax.get_position().bounds
-            ax.set_position([pos[0]-0.03*i, pos[1], pos[2], pos[3]])
+            ax.set_position([pos[0]-0.01*i, pos[1], pos[2], pos[3]])
             img = np.maximum(0, imgs[iex].copy().astype("float32"))
             if noise_type=="poisson":
                 params = {"poisson": 1.0, "blur": 0.0, "downsample": 0.0, "pscale": param[k]}
@@ -1476,25 +1688,25 @@ def supp_noise(root, save_fig=False):
                 il = plot_label(ltr, il, ax, transl, fs_title)
             ax.set_title(["low", "medium", "high"][i], loc="center", y=-0.18, fontsize="medium")
             
-        ax = plt.subplot(grid1[0, 3])
-        pos = ax.get_position().bounds
-        ax.set_position([pos[0]-0.025, pos[1]+0.15*pos[3], pos[2], pos[3]*0.9])
-        for j in range(len(algs)):
-            ax.errorbar(np.arange(3), aps[j, :,:,0].mean(axis=-1).T, aps[j, :,:,0].std(axis=-1).T / (66**0.5),
-                        color=alg_dict[algs[j]]["color"])
-            if ii==0:
-                xpos = 1.2 if j<3 else 0.05
-                ypos = 1.07-j*0.15 if j<3 else 0.3-(j-3)*0.15
-                ax.text(xpos, ypos, alg_dict[algs[j]]["name"].replace("-","\n"), fontsize="medium",
-                        color=alg_dict[algs[j]]["color"], transform=ax.transAxes, 
-                        ha="right" if j<3 else "left", va="top")
-        ax.set_ylabel("AP @ 0.5 IoU")
-        ax.set_xticks([0, 1, 2])
-        ax.set_ylim([0, 1])
-        ax.set_yticks([0, 0.5, 1.0])
-        ax.set_xticklabels(["low", "medium", "high"])
-        ax.set_xlabel(xstr[ii])
-        print(nstr[ii], aps[:,:,:,0].mean(axis=-1))
+        # ax = plt.subplot(grid1[0, 3])
+        # pos = ax.get_position().bounds
+        # ax.set_position([pos[0]-0.025, pos[1]+0.15*pos[3], pos[2], pos[3]*0.9])
+        # for j in range(len(algs)):
+        #     ax.errorbar(np.arange(3), aps[j, :,:,0].mean(axis=-1).T, aps[j, :,:,0].std(axis=-1).T / (66**0.5),
+        #                 color=alg_dict[algs[j]]["color"])
+        #     if ii==0:
+        #         xpos = 1.2 if j<3 else 0.05
+        #         ypos = 1.07-j*0.15 if j<3 else 0.3-(j-3)*0.15
+        #         ax.text(xpos, ypos, alg_dict[algs[j]]["name"].replace("-","\n"), fontsize="medium",
+        #                 color=alg_dict[algs[j]]["color"], transform=ax.transAxes, 
+        #                 ha="right" if j<3 else "left", va="top")
+        # ax.set_ylabel("AP @ 0.5 IoU")
+        # ax.set_xticks([0, 1, 2])
+        # ax.set_ylim([0, 1])
+        # ax.set_yticks([0, 0.5, 1.0])
+        # ax.set_xticklabels(["low", "medium", "high"])
+        # ax.set_xlabel(xstr[ii])
+        # print(nstr[ii], aps[:,:,:,0].mean(axis=-1))
 
     if save_fig:
         fig.savefig("figures/supp_noise.pdf", dpi=150)
@@ -1633,4 +1845,6 @@ def supp_realnoise(root, save_fig=False):
 
     if save_fig:
         fig.savefig("figures/supp_realnoise.pdf", dpi=150)
+
+
         

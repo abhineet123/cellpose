@@ -136,11 +136,11 @@ def run_cellpose4(dsets=None, mtype="cpsam"):
     elif mtype=='cpdino_ps16':
         pretrained_model = root / "../models/cpsam8_2000_162519454"
     elif mtype=='cpsam_linear':
-        pretrained_model = root / "../models/cpsam8_1000_611548662_linearprobe"
+        pretrained_model = root / "../models/cpsam8_1000_266324281_linearprobe"
     elif mtype=='cpdino-vitb_linear':
-        pretrained_model = root / "../models/cp1000_0.0002_0.4_0.1_718014955_linearprobe"        
+        pretrained_model = root / "../models/cp1000_0.002_0.4_0.1_659878492_linearprobe"        
     elif mtype=='cpdino_linear':
-        pretrained_model = root / "../models/cp1000_0.0002_0.4_0.1_202203273_linearprobe"
+        pretrained_model = root / "../models/cp1000_0.002_0.4_0.1_195219516_linearprobe"
     
     model = models.CellposeModel(gpu=True, pretrained_model=pretrained_model)
 
@@ -164,6 +164,7 @@ def run_cellpose4(dsets=None, mtype="cpsam"):
         for i in trange(len(imgs)):
             img = imgs[i]
 
+            flip = None
             if dset[:5]=="cyto2":
                 cperms = {"RGB": [0, 1, 2], "BGR": [2, 1, 0], "GBR": [1, 2, 0], "random": "random"}
                 if len(dset.split("_")) > 1 and dset.split("_")[1] in cperms:
@@ -174,12 +175,27 @@ def run_cellpose4(dsets=None, mtype="cpsam"):
                         if img.shape[2] < 3:
                             img = np.concatenate((img, np.zeros((img.shape[0], img.shape[1], 3-img.shape[2]), dtype=img.dtype)), axis=2)
                         img = img[:,:,irgb]
+                        if i==0:
+                            print(irgb)
+                            print(img.max(axis=(0,1)))
+                elif len(dset.split("_")) > 1 and (dset.split("_")[1] == "lr" or dset.split("_")[1] == "ud"):
+                    flip = dset.split("_")[1]
+                    if dset.split("_")[1] == "lr":
+                        img = img[:, ::-1]
+                    else:
+                        img = img[::-1]
 
             tic = time.time()
             masks_pred0, flows0, styles = model.eval(img, augment=False, 
                                         niter=2000 if "bac" in dset else None,
                                         bsize=None, tile_overlap=0.1, batch_size=64,
                                         flow_threshold=0.4, cellprob_threshold=-0.5)
+            if flip is not None:
+                if flip == "lr":
+                    masks_pred0 = masks_pred0[:, ::-1]
+                else:
+                    masks_pred0 = masks_pred0[::-1]
+
             toc = time.time() - tic
             runtime.append(toc)
             masks_pred.append(masks_pred0)

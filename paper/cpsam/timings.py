@@ -1,14 +1,9 @@
 import time, os
 import numpy as np
 from cellpose import io, models, train
-from cellpose.transforms import normalize_img
-from scipy.ndimage import gaussian_filter1d
 from pathlib import Path
 import torch
-from torch import nn
 import time
-from glob import glob
-import matplotlib.pyplot as plt
 import argparse
 import time
 
@@ -40,26 +35,32 @@ if __name__ == "__main__":
     parser.add_argument("--alg", type=str, default="cpsam", 
                         choices=["cpsam", "cpdino", "cpdino-vitb", "cyto3"])
     args = parser.parse_args()
+
     alg = args.alg
     ntiles = args.ntiles
     if alg == "cyto3":
         model = models.CellposeModel(device=torch.device("cuda:0"), model_type="cyto3") 
     else:
+        if alg == "cpsam":
+            alg = "cpsam_v2"
         model = models.CellposeModel(device=torch.device("cuda:0"), pretrained_model=alg)
     if not args.train:
         if args.use_3D:
-            img = io.imread("/media/carsen/disk1/datasets_cellpose/cells_3D/tim_nov4_crop2.tif")
-            if ntiles==1:
-                img = img[50:200, :, 100:250, 100:250]
+            if Path("/media/carsen/disk1/datasets_cellpose/cells_3D/tim_nov4_crop2.tif").exists():
+                img = io.imread("/media/carsen/disk1/datasets_cellpose/cells_3D/tim_nov4_crop2.tif")
             else:
-                img = img[50:350, :, 50:350, 50:350]
+                img = io.imread("/groups/stringer/stringerlab/datasets_cellpose/cells_3D/tim_nov4_crop2.tif")
+            if ntiles==1:
+                img = img[50:200, :, 100:250, 100:250].transpose(0,2,3,1).copy()
+            else:
+                img = img[50:350, :, 50:350, 50:350].transpose(0,2,3,1).copy()
                 if ntiles > 2:
-                    img = np.tile(img, (ntiles//2, 1, ntiles//2, ntiles//2))
+                    img = np.tile(img, (ntiles//2, ntiles//2, ntiles//2, 1))
             print("IMG SHAPE: ", img.shape)
-            masks = model.eval(img[100,:, :150,:150], batch_size=32, diameter=30.)[0]
+            masks = model.eval(img[100,:150,:150], batch_size=32, diameter=30.)[0]
             tic = time.time()
             masks = model.eval(img, do_3D=True, batch_size=32, z_axis=0, 
-                               channel_axis=1, diameter=30.)[0]
+                               channel_axis=-1, diameter=30.)[0]
             print(f"{time.time() - tic : .4f}")
         else:
             img = io.imread(Path.home() / ".cellpose/data/2D" / "rgb_2D.png")
@@ -77,8 +78,8 @@ if __name__ == "__main__":
     else:
         imgs = [io.imread(Path.home() / ".cellpose/data/2D" / "rgb_2D.png"), 
                 io.imread(Path.home() / ".cellpose/data/2D" / "gray_2D.png")]
-        masks = [io.imread(Path.home() / ".cellpose/data/2D" / "rgb_2D_cyto_masks.png"), 
-                 io.imread(Path.home() / ".cellpose/data/2D" / "gray_2D_cyto_masks.png")]
+        masks = [io.imread(Path.home() / ".cellpose/data/2D" / "rgb_2D_cp4_gt_masks.png"), 
+                 io.imread(Path.home() / ".cellpose/data/2D" / "gray_2D_cp4_gt_masks.png")]
         net = model.net 
         tic = time.time()    
         train.train_seg(net, train_data=imgs, train_labels=masks, learning_rate=1e-5,

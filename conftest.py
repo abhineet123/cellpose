@@ -71,6 +71,6 @@ def cellposemodel_fixture_2layer():
     use_gpu = torch.cuda.is_available()
     use_mps = 'mps' if torch.backends.mps.is_available() else False
     gpu = use_gpu or use_mps
-    model = models.CellposeModel(gpu=gpu, pretrained_model="cpdino_vitb")
+    model = models.CellposeModel(gpu=gpu, pretrained_model="cpdino-vitb")
     model.net.encoder.blocks = model.net.encoder.blocks[:2]
     yield model
