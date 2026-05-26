@@ -674,10 +674,10 @@ class MainW(QMainWindow):
         if self.loaded:
             sval = self.sliders[r].value()
             self.saturation[r][self.currentZ] = sval
-            if not self.autobtn.isChecked():
-                for r in range(3):
-                    for i in range(len(self.saturation[r])):
-                        self.saturation[r][i] = self.saturation[r][self.currentZ]
+            # if not self.autobtn.isChecked():
+            for r in range(3):
+                for i in range(len(self.saturation[r])):
+                    self.saturation[r][i] = self.saturation[r][self.currentZ]
             self.update_plot()
 
     def keyPressEvent(self, event):
@@ -834,8 +834,7 @@ class MainW(QMainWindow):
     def disable_buttons_removeROIs(self):
         if len(self.model_strings) > 0:
             self.ModelButtonC.setEnabled(False)
-        for i in range(len(self.StyleButtons)):
-            self.StyleButtons[i].setEnabled(False)
+        self.ModelButtonB.setEnabled(False)
         self.newmodel.setEnabled(False)
         self.loadMasks.setEnabled(False)
         self.saveSet.setEnabled(False)
@@ -1485,14 +1484,11 @@ class MainW(QMainWindow):
             if self.color == 'rgb':
                 self.img.setImage(image, autoLevels=False, lut=None)
                 if self.nchan > 1:
-                    levels = np.array([
-                        self.saturation[0][self.currentZ],
-                        self.saturation[1][self.currentZ],
-                        self.saturation[2][self.currentZ]
-                    ])
-                    self.img.setLevels(levels)
-                else:
-                    self.img.setLevels(self.saturation[0][self.currentZ])
+                    levels = np.array([self.saturation[r][self.currentZ] for r in range(image.shape[-1])])
+                else: 
+                    levels = self.saturation[0][self.currentZ]
+                self.img.setLevels(levels)
+                
             elif self.color in rgb_list:
                 color_index = rgb_list.index(self.color)
                 if self.nchan > 1:
@@ -1505,6 +1501,7 @@ class MainW(QMainWindow):
             elif self.color == 'gray':
                 if self.nchan > 1:
                     # exclude channels with no data:
+                    # TODO: save this when computing saturation 
                     ranges = np.ptp(image, tuple(range(image.ndim-1)))
                     range_mask = ranges > 1e-5
                     image = image[..., range_mask]
@@ -1881,12 +1878,30 @@ class MainW(QMainWindow):
                 else:
                     for n in range(self.NZ):
                         self.saturation[-1].append([0, 255.])
-            print(self.saturation[2][self.currentZ])
-
-            if img_norm.shape[-1] == 1:
-                self.saturation.append(self.saturation[0])
-                self.saturation.append(self.saturation[0])
-
+        
+        elif len(self.saturation) == 0 or len(self.saturation[0]) != self.NZ:
+            self.saturation = []
+            for r in range(3):
+                self.saturation.append([])
+                for n in range(self.NZ):
+                    self.saturation[-1].append([0, 255])
+        
+        if img_norm.shape[-1] == 1:
+            if len(self.saturation) > 1:
+                self.saturation = [self.saturation[0]]
+            self.saturation.append(self.saturation[0])
+            self.saturation.append(self.saturation[0])
+        else:
+            self.saturation = [copy.deepcopy(self.saturation[r]) for r in range(img_norm.shape[-1])]
+            if len(self.saturation) == 2:
+                self.saturation.append([])
+                for n in range(self.NZ):
+                    self.saturation[-1].append([0, 255])
+        
+        self.sliders[0].setValue(self.saturation[0][self.currentZ])
+        self.sliders[1].setValue(self.saturation[1][self.currentZ])
+        self.sliders[2].setValue(self.saturation[2][self.currentZ])
+        # print(len(self.saturation), len(self.saturation[0]))
 
     def get_model_path(self, custom=False):
         if custom:
