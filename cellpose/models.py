@@ -16,7 +16,11 @@ import logging
 models_logger = logging.getLogger(__name__)
 
 from . import transforms, dynamics, utils, plot
-from .vit import CPSAM, CPDINO
+from .vit import CPSAM
+try:
+    from .vit import CPDINO
+except:
+    models_logger.warning("Could not import CPDINO, run `pip install cellpose[dino]` to use CPDINO model")
 from .core import assign_device, run_net, run_3D
 
 _MODEL_URL = "https://huggingface.co/mouseland/cellpose-sam/resolve/main/"
