@@ -28,7 +28,7 @@ _MODEL_DIR_ENV = os.environ.get("CELLPOSE_LOCAL_MODELS_PATH")
 _MODEL_DIR_DEFAULT = Path.home().joinpath(".cellpose", "models")
 MODEL_DIR = Path(_MODEL_DIR_ENV) if _MODEL_DIR_ENV else _MODEL_DIR_DEFAULT
 
-MODEL_NAMES = ["cpdino", "cpsam_v2", "cpdino-vitb", "cpsam"]
+MODEL_NAMES = ["cpsam_v2", "cpdino", "cpdino-vitb", "cpsam"]
 
 MODEL_LIST_PATH = os.fspath(MODEL_DIR.joinpath("gui_models.txt"))
 
@@ -89,7 +89,7 @@ class CellposeModel():
         nclasses (int): Number of classes in the model.
         nbase (list): List of base values for the model.
         net (CPnet): Cellpose network.
-        pretrained_model (str): Name of pretrained model ("cpdino", "cpsam_v2", etc) or path to pretrained cellpose model.
+        pretrained_model (str): Name of pretrained model ("cpdino", "cpsam_v2", etc) or path to pretrained cellpose model. Default is "cpsam_v2".
         backbone (str): Type of network ("default" is the standard res-unet, "transformer" for the segformer).
 
     Methods:
@@ -101,7 +101,7 @@ class CellposeModel():
 
     """
 
-    def __init__(self, gpu=False, pretrained_model="cpdino", model_type=None,
+    def __init__(self, gpu=False, pretrained_model="cpsam_v2", model_type=None,
                  diam_mean=None, device=None, nchan=None, use_bfloat16=True):
         """
         Initialize the CellposeModel.
@@ -149,7 +149,7 @@ class CellposeModel():
                 models_logger.warning(
                     f"pretrained model {pretrained_model} not found, using default model"
                 )
-                pretrained_model = cache_model_path("cpdino")
+                pretrained_model = cache_model_path("cpsam_v2")
 
         self.pretrained_model = pretrained_model
         dtype = torch.bfloat16 if use_bfloat16 else torch.float32 

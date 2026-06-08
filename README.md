@@ -32,7 +32,7 @@ Example notebooks:
 
 New Cellpose4 models added! We have included new Cellpose models based on [DINOv3](https://github.com/facebookresearch/dinov3), `cpdino` and `cpdino-vitb`. 
 We have also updated the CellposeSAM model (`cpsam_v2`), and it now predicts fewer spurious masks in low-contrast regions. 
-To use the new models, `pip install cellpose[dino] --upgrade`, and find more details [here](https://cellpose.readthedocs.io/en/latest/models.html).
+To use the new models, `pip install cellpose --upgrade` and `pip install git+https://github.com/facebookresearch/dinov3`, and find more details [here](https://cellpose.readthedocs.io/en/latest/models.html).
 
 :triangular_flag_on_post: All Cellpose models are trained on data that is licensed under **CC-BY-NC**. The Cellpose annotated dataset is also CC-BY-NC.
 
@@ -105,7 +105,8 @@ If you are using a GPU, make sure its drivers and the cuda libraries are correct
 3. Create a new environment with `conda create --name cellpose python=3.12`. We recommend python 3.12, but python 3.9 and 3.11 will also work.
 4. To activate this new environment, run `conda activate cellpose`
 5. (option 1) To install cellpose with the GUI, run `python -m pip install cellpose[gui]`.  If you're on a zsh server, you may need to use ' ': `python -m pip install 'cellpose[gui]'`.
-6. (option 2) To install cellpose without the GUI, run `python -m pip install cellpose[dino]`. 
+6. (option 2) To install cellpose without the GUI, run `python -m pip install cellpose`. 
+7. Install the DINOv3 package to use the CellposeDINO models with `python -m pip install git+https://github.com/facebookresearch/dinov3`.
 
 To upgrade cellpose (package [here](https://pypi.org/project/cellpose/)), run the following in the environment:
 

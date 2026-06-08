@@ -65,9 +65,9 @@ def get_arg_parser():
 
     # model settings
     model_args = parser.add_argument_group("Model Arguments")
-    model_args.add_argument("--pretrained_model", required=False, default="cpdino",
+    model_args.add_argument("--pretrained_model", required=False, default="cpsam_v2",
                             type=str,
-                            help="path to model for segmentation or starting training, or builtin model name: cpdino, cpsam_v2, cpdino-vitb, or cpsam")
+                            help="path to model for segmentation or starting training, or builtin model name: cpsam_v2, cpdino, cpdino-vitb, or cpsam")
     model_args.add_argument(
         "--add_model", required=False, default=None, type=str,
         help="model path to copy model to hidden .cellpose folder for using in GUI/CLI")

@@ -8,8 +8,8 @@ Built-in models
 
 We have four built-in models available:
 
-* ``cpdino``: this is the CellposeDINO model released in June 2026 using the DINOv3-ViTL backbone
 * ``cpsam_v2``: this is the CellposeSAM model released in June 2026 using the SAM-ViTL backbone, it includes a fix in the training for low contrast regions
+* ``cpdino``: this is the CellposeDINO model released in June 2026 using the DINOv3-ViTL backbone
 * ``cpdino-vitb``: this is the CellposeDINO model released in June 2026 using the DINOv3-ViTB backbone (smaller model)
 * ``cpsam``: this is the original CellposeSAM model released in April 2025 using the SAM-ViTL backbone
 
