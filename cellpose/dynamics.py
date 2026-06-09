@@ -734,7 +734,10 @@ def compute_masks(dP, cellprob, p=None, niter=200, cellprob_threshold=0.0,
         mask = utils.fill_holes_and_remove_small_masks(mask, min_size=min_size)
 
     if mask.dtype == np.uint32:
-        dynamics_logger.warning(
+        if mask.max() < 2**16:
+            mask = mask.astype("uint16")
+        else:
+            dynamics_logger.warning(
             "more than 65535 masks in image, masks returned as np.uint32")
 
     return mask
