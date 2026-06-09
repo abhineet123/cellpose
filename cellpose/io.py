@@ -894,3 +894,5 @@ def save_masks(images, masks, flows, file_names, png=True, tif=False, channels=[
               )
         #save full flow data
         imsave(os.path.join(flowdir, basename + '_dP' + suffix + '.tif'), flows[1])
+        # save cellprob
+        imsave(os.path.join(flowdir, basename + '_cellprob' + suffix + '.tif'), flows[2])
