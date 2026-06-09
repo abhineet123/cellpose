@@ -72,10 +72,10 @@ def _reshape_norm(data, channel_axis=None, normalize_params={"normalize": False}
                 # put channel axis first 
                 td = np.moveaxis(td, channel_axis0, 0)
                 td = td[:3] # keep at most 3 channels
-            if td.ndim == 2 or (td.ndim == 3 and td.shape[0] == 1):
+            if td.ndim == 2:
                 td = np.stack((td, 0*td, 0*td), axis=0)
             elif td.ndim == 3 and td.shape[0] < 3:
-                td = np.concatenate((td, 0*td[:1]), axis=0)
+                td = np.concatenate((td, np.zeros((3 - td.shape[0], *td.shape[1:]), dtype=td.dtype)), axis=0)
             data_new.append(td)
         data = data_new
     if normalize_params["normalize"]:
