@@ -529,9 +529,9 @@ def stitch3D(masks, stitch_threshold=0.25):
     mmax = masks[0].max()
     empty = 0
     for i in trange(len(masks) - 1):
-        iou = metrics._intersection_over_union(masks[i + 1], masks[i])[1:, 1:]
-        if mmax > 2**16 - 2:
+        if masks.dtype == "uint16" and int(mmax) > max(0, 2**16 - 5 - masks[i + 1].max()):
             masks = masks.astype("uint32")
+        iou = metrics._intersection_over_union(masks[i + 1], masks[i])[1:, 1:]
         if not iou.size and empty == 0:
             masks[i + 1] = masks[i + 1]
             mmax = masks[i + 1].max()
