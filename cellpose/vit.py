@@ -15,7 +15,7 @@ vit_logger = logging.getLogger(__name__)
 try:
     from dinov3.hub.backbones import dinov3_vitl16, dinov3_vitb16
 except:
-    vit_logger.warning("Could not import CPDINO, run `pip install cellpose[dino]` to use CPDINO model")
+    vit_logger.warning("Could not import CPDINO, run `pip install git+https://github.com/facebookresearch/dinov3` to use CPDINO model")
 
 
 class BaseModel(nn.Module):

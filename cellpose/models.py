@@ -20,7 +20,7 @@ from .vit import CPSAM
 try:
     from .vit import CPDINO
 except:
-    models_logger.warning("Could not import CPDINO, run `pip install cellpose[dino]` to use CPDINO model")
+    models_logger.warning("Could not import CPDINO, run `pip install git+https://github.com/facebookresearch/dinov3` to use CPDINO model")
 from .core import assign_device, run_net, run_3D
 
 _MODEL_URL = "https://huggingface.co/mouseland/cellpose-sam/resolve/main/"
@@ -108,9 +108,9 @@ class CellposeModel():
 
         Parameters:
             gpu (bool, optional): Whether or not to save model to GPU, will check if GPU available.
-            pretrained_model (str or list of strings, optional): Full path to pretrained cellpose model(s), if None or False, no model loaded.
+            pretrained_model (str): Name of pretrained model ("cpdino", "cpsam_v2", etc) or path to pretrained cellpose model. Default is "cpsam_v2".
             model_type (str, optional): Any model that is available in the GUI, use name in GUI e.g. "livecell" (can be user-trained or model zoo).
-            diam_mean (float, optional): Mean "diameter", 30. is built-in value for "cyto" model; 17. is built-in value for "nuclei" model; if saved in custom model file (cellpose>=2.0) then it will be loaded automatically and overwrite this value.
+            diam_mean (float, optional): Deprecated in v4.0.1+, not used.
             device (torch device, optional): Device used for model running / training (torch.device("cuda") or torch.device("cpu")), overrides gpu input, recommended if you want to use a specific GPU (e.g. torch.device("cuda:1")).
             use_bfloat16 (bool, optional): Use 16bit float precision instead of 32bit for model weights. Default to 16bit (True).
         """
