@@ -126,6 +126,8 @@ See the help message for more information:
     --all_channels        use all channels in image if using own model and images with special channels
     --anisotropy ANISOTROPY
                             anisotropy of volume in 3D
+    --seg_masks           use 3D masks saved in a _seg.npy file to create 2D _seg.npy files
+
 
     algorithm arguments:
     --sharpen_radius SHARPEN_RADIUS
