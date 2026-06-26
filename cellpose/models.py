@@ -127,7 +127,6 @@ class CellposeModel:
             model_type (str, optional): Any model that is available in the GUI, use name in GUI e.g. "livecell" (can be user-trained or model zoo).
             diam_mean (float, optional): Deprecated in v4.0.1+, not used.
             device (torch device, optional): Device used for model running / training (torch.device("cuda") or torch.device("cpu")), overrides gpu input, recommended if you want to use a specific GPU (e.g. torch.device("cuda:1")).
-            device2 (torch device, optional): Device used for post processing; defaults to "device"
             use_bfloat16 (bool, optional): Use 16bit float precision instead of 32bit for model weights. Default to 16bit (True).
         """
         if diam_mean is not None:
@@ -145,8 +144,6 @@ class CellposeModel:
 
         ### assign model device
         self.device = assign_device(gpu=gpu)[0] if device is None else device
-        self.device2 = self.device if device2 is None else device2
-        self.verbose = verbose
 
         if torch.cuda.is_available():
             device_gpu = self.device.type == "cuda"
@@ -475,7 +472,6 @@ class CellposeModel:
                 batch_size=batch_size,
                 tile_overlap=tile_overlap,
                 rsz=rescale if rescale != 1.0 else None,
-                verbose=self.verbose,
             )
 
             if resample:
